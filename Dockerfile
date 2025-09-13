@@ -1,26 +1,23 @@
-# Use Node.js LTS version
-FROM node:20
+# Use official Node.js 18 LTS image
+FROM node:18
 
 # Set working directory
 WORKDIR /app
 
-# Copy package.json and package-lock.json
+# Copy package.json and package-lock.json first (better build caching)
 COPY package*.json ./
 
-# Clean npm cache (optional, avoids old cache issues)
-RUN npm cache clean --force
-
-# Install dependencies with legacy peer deps
+# Install dependencies with legacy peer deps to avoid conflicts
 RUN npm install --legacy-peer-deps
 
-# Copy the rest of the app
+# Copy the rest of the application code
 COPY . .
 
-# Build the React app (if it’s a React app)
+# Build the app (optional, depends on your project type)
 RUN npm run build
 
-# Expose port 3000
+# Expose the application port
 EXPOSE 3000
 
-# Start the app
+# Run the app
 CMD ["npm", "start"]
