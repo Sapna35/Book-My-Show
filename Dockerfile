@@ -4,20 +4,20 @@ FROM node:18
 # Set working directory
 WORKDIR /app
 
-# Copy package.json and package-lock.json first (better build caching)
+# Copy package.json and package-lock.json first
 COPY package*.json ./
 
-# Install dependencies with legacy peer deps to avoid conflicts
+# Install dependencies with legacy peer deps
 RUN npm install --legacy-peer-deps
 
 # Copy the rest of the application code
 COPY . .
 
-# Build the app (optional, depends on your project type)
+# Build the app
 RUN npm run build
 
-# Expose the application port
+# Expose app port
 EXPOSE 3000
 
-# Run the app
+# Start the app
 CMD ["npm", "start"]
