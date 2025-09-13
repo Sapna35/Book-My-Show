@@ -16,20 +16,23 @@ pipeline {
 
         stage('Install Dependencies') {
             steps {
-                sh 'npm install'
+                dir('bookmyshow-app') {   // <- go inside folder
+                    sh 'npm install'
+                }
             }
         }
 
         stage('SonarQube Analysis') {
             steps {
                 echo "SonarQube scan would run here"
-                // needs SonarQube server setup
             }
         }
 
         stage('Docker Build') {
             steps {
-                sh 'docker build -t sapna350/bms-app:latest .'
+                dir('bookmyshow-app') {   // <- Docker build context is inside folder
+                    sh 'docker build -t sapna350/bms-app:latest .'
+                }
             }
         }
 
