@@ -2,12 +2,11 @@ apiVersion: v1
 kind: Service
 metadata:
   name: bms-service
-  labels:
-    app: bms
+  namespace: sapna-bms
 spec:
   type: LoadBalancer
-  ports:
-  - port: 80
-    targetPort: 3000  # Replace with the port your app runs on
   selector:
     app: bms
+  ports:
+    - port: 80          # Service Port (public-facing)
+      targetPort: 3000  # App inside container
