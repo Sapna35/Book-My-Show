@@ -16,7 +16,7 @@ pipeline {
 
         stage('Install Dependencies') {
             steps {
-                dir('bookmyshow-app') {   // <- go inside folder
+                dir('bookmyshow-app') {   
                     sh 'npm install'
                 }
             }
@@ -30,7 +30,7 @@ pipeline {
 
         stage('Docker Build') {
             steps {
-                dir('bookmyshow-app') {   // <- Docker build context is inside folder
+                dir('bookmyshow-app') {   
                     sh 'docker build -t sapna350/bms-app:latest .'
                 }
             }
