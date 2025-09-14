@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: bms-app
-          image: sapna350/bms-app:latest   # replace with your DockerHub image
+          image: sapna350/bms-app:latest   
           ports:
             - containerPort: 3000
           resources:
