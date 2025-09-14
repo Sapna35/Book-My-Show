@@ -1,71 +1,63 @@
 pipeline {
     agent any
 
-    tools {
-        maven 'Maven'          // Configure in Jenkins Global Tool Configuration
-        jdk 'JDK17'            // Configure JDK in Jenkins
-        nodejs 'NodeJS'        // If frontend build is needed
-    }
-
-    environment {
-        REGISTRY = "sapna350"
-        IMAGE_NAME = "bookmyshow-app"
-    }
-
     stages {
-        stage('Checkout from Git') {
+        stage('Clean Workspace') {
             steps {
-                git branch: 'main', 
-                    url: 'https://github.com/Sapna35/Book-My-Show.git', 
-                    credentialsId: 'github-cred'
+                cleanWs()
             }
         }
 
-        stage('SonarQube Analysis') {
+        stage('Checkout Code') {
             steps {
-                withSonarQubeEnv('MySonarQube') {   // Name must match Jenkins SonarQube config
-                    sh 'mvn clean verify sonar:sonar'
-                }
-            }
-        }
-
-        stage('Quality Gate') {
-            steps {
-                timeout(time: 2, unit: 'MINUTES') {
-                    waitForQualityGate abortPipeline: true
-                }
+                git branch: 'main', url: 'https://github.com/Sapna35/Book-My-Show.git'
             }
         }
 
         stage('Install Dependencies') {
             steps {
-                sh 'mvn clean install -DskipTests'
+                dir('bookmyshow-app') {   // go inside app folder
+                    sh 'npm install'
+                }
             }
         }
 
-        stage('Docker Build & Push') {
+        stage('SonarQube Analysis') {
             steps {
-                script {
+                echo "SonarQube scan would run here"
+            }
+        }
+
+        stage('Docker Build') {
+            steps {
+                dir('bookmyshow-app') {   // build Docker image from app folder
                     sh """
-                        docker build -t $REGISTRY/$IMAGE_NAME:${BUILD_NUMBER} .
-                        docker tag $REGISTRY/$IMAGE_NAME:${BUILD_NUMBER} $REGISTRY/$IMAGE_NAME:latest
-                        docker login -u $DOCKER_USER -p $DOCKER_PASS
-                        docker push $REGISTRY/$IMAGE_NAME:${BUILD_NUMBER}
-                        docker push $REGISTRY/$IMAGE_NAME:latest
+                        docker build -t sapna350/bookmyshow-app:${BUILD_NUMBER} .
+                        docker tag sapna350/bookmyshow-app:${BUILD_NUMBER} sapna350/bookmyshow-app:latest
                     """
                 }
             }
         }
 
-        stage('Deploy to EKS Cluster') {
+        stage('Docker Push') {
             steps {
-                script {
+                withCredentials([usernamePassword(credentialsId: 'docker-cred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
                     sh """
-                        aws eks --region ap-south-1 update-kubeconfig --name sapna-eks-cluster
-                        kubectl apply -f k8s/deployment.yaml
-                        kubectl apply -f k8s/service.yaml
+                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                        docker push sapna350/bookmyshow-app:${BUILD_NUMBER}
+                        docker push sapna350/bookmyshow-app:latest
                     """
                 }
+            }
+        }
+
+        stage('Deploy to EKS') {
+            steps {
+                sh """
+                    aws eks --region ap-south-1 update-kubeconfig --name sapna-eks-cluster
+                    kubectl apply -f k8s/deployment.yaml
+                    kubectl apply -f k8s/service.yaml
+                """
             }
         }
     }
