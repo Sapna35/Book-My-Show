@@ -2,43 +2,36 @@ pipeline {
     agent any
 
     tools {
-        jdk 'jdk17'
-        nodejs 'node23'
+        maven 'Maven'          // Configure in Jenkins Global Tool Configuration
+        jdk 'JDK17'            // Configure JDK in Jenkins
+        nodejs 'NodeJS'        // If frontend build is needed
     }
 
     environment {
-        REGISTRY = "sapna350/bookmyshow"
-        IMAGE_TAG = "latest"
+        REGISTRY = "sapna350"
+        IMAGE_NAME = "bookmyshow-app"
     }
 
     stages {
-
         stage('Checkout from Git') {
             steps {
-                git(
-                    url: 'https://github.com/Sapna35/Book-My-Show.git',
-                    branch: 'main',
+                git branch: 'main', 
+                    url: 'https://github.com/Sapna35/Book-My-Show.git', 
                     credentialsId: 'github-cred'
-                )
             }
         }
 
         stage('SonarQube Analysis') {
             steps {
-                withSonarQubeEnv('sonar-server') {   // 👈 make sure this name matches Jenkins config
-                    sh '''
-                        ./gradlew sonarqube \
-                          -Dsonar.projectKey=BookMyShow \
-                          -Dsonar.host.url=http://13.38.227.93:9000 \
-                          -Dsonar.login=$SONAR_AUTH_TOKEN
-                    '''
+                withSonarQubeEnv('MySonarQube') {   // Name must match Jenkins SonarQube config
+                    sh 'mvn clean verify sonar:sonar'
                 }
             }
         }
 
         stage('Quality Gate') {
             steps {
-                timeout(time: 5, unit: 'MINUTES') {
+                timeout(time: 2, unit: 'MINUTES') {
                     waitForQualityGate abortPipeline: true
                 }
             }
@@ -46,35 +39,48 @@ pipeline {
 
         stage('Install Dependencies') {
             steps {
-                sh 'npm install --prefix bookmyshow-app'
+                sh 'mvn clean install -DskipTests'
             }
         }
 
         stage('Docker Build & Push') {
             steps {
-                sh """
-                   docker build -t $REGISTRY:$IMAGE_TAG .
-                   docker push $REGISTRY:$IMAGE_TAG
-                """
+                script {
+                    sh """
+                        docker build -t $REGISTRY/$IMAGE_NAME:${BUILD_NUMBER} .
+                        docker tag $REGISTRY/$IMAGE_NAME:${BUILD_NUMBER} $REGISTRY/$IMAGE_NAME:latest
+                        docker login -u $DOCKER_USER -p $DOCKER_PASS
+                        docker push $REGISTRY/$IMAGE_NAME:${BUILD_NUMBER}
+                        docker push $REGISTRY/$IMAGE_NAME:latest
+                    """
+                }
             }
         }
 
         stage('Deploy to EKS Cluster') {
             steps {
-                sh """
-                   kubectl apply -f deployment.yml
-                   kubectl apply -f service.yml
-                """
+                script {
+                    sh """
+                        aws eks --region ap-south-1 update-kubeconfig --name sapna-eks-cluster
+                        kubectl apply -f k8s/deployment.yaml
+                        kubectl apply -f k8s/service.yaml
+                    """
+                }
             }
         }
     }
 
     post {
         always {
-            emailext(
-                to: 'sapna.rani@gmail.com',
-                subject: "Build \${currentBuild.fullDisplayName} - \${currentBuild.currentResult}",
-                body: "Check Jenkins for details: \${env.BUILD_URL}"
+            emailext (
+                to: 'sapnarani3502@gmail.com',
+                subject: "Jenkins Pipeline: ${currentBuild.currentResult}",
+                body: """
+                    Build result: ${currentBuild.currentResult}
+                    Project: ${env.JOB_NAME}
+                    Build Number: ${env.BUILD_NUMBER}
+                    Check console output at ${env.BUILD_URL}
+                """
             )
         }
     }
