@@ -46,14 +46,25 @@ pipeline {
         }
 
         stage('Deploy') {
-            steps {
-                sh '''
-                # Stop old container if running
-                docker ps -q --filter "ancestor=sapna350/bms-app:latest" | xargs -r docker stop
-                docker run -d -p 3000:3000 sapna350/bms-app:latest
-                '''
-            }
-        }
+    steps {
+        sh '''
+        # Stop old container if running
+        docker ps -q --filter "ancestor=sapna350/bms-app:latest" | xargs -r docker stop
+        docker ps -q --filter "ancestor=sapna350/bms-app:latest" | xargs -r docker rm
+        
+        # Free port 3000 if any container is bound to it
+        old_container=$(docker ps -q --filter "publish=3000")
+        if [ ! -z "$old_container" ]; then
+            docker stop $old_container
+            docker rm $old_container
+        fi
+
+        # Run fresh container
+        docker run -d -p 3000:3000 --name bms-app sapna350/bms-app:latest
+        '''
+    }
+}
+
     }
 
     post {
