@@ -47,8 +47,40 @@ pipeline {
 
         stage('Deploy') {
             steps {
-                sh 'docker run -d -p 3000:3000 sapna350/bms-app:latest'
+                sh '''
+                # Stop old container if running
+                docker ps -q --filter "ancestor=sapna350/bms-app:latest" | xargs -r docker stop
+                docker run -d -p 3000:3000 sapna350/bms-app:latest
+                '''
             }
+        }
+    }
+
+    post {
+        success {
+            emailext(
+                subject: " SUCCESS: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]'",
+                body: """<p>The build completed <b>SUCCESSFULLY</b>.</p>
+                         <p>Project: ${env.JOB_NAME}</p>
+                         <p>Build Number: ${env.BUILD_NUMBER}</p>
+                         <p>URL: <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>""",
+                to: 'sapnarani3502@gmail.com'
+            )
+        }
+
+        failure {
+            emailext(
+                subject: " FAILURE: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]'",
+                body: """<p>The build has <b>FAILED</b>.</p>
+                         <p>Project: ${env.JOB_NAME}</p>
+                         <p>Build Number: ${env.BUILD_NUMBER}</p>
+                         <p>URL: <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>""",
+                to: 'sapnarani3502@gmail.com'
+            )
+        }
+
+        always {
+            echo "Build finished. Email notification sent."
         }
     }
 }
