@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: bms-service
+  namespace: sapna-bms
+spec:
+  type: LoadBalancer
+  selector:
+    app: bms
+  ports:
+    - protocol: TCP
+      port: 80          # External & internal port for the service
+      targetPort: 80    # Container port exposed in deployment
+
