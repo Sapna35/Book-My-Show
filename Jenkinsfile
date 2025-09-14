@@ -7,33 +7,30 @@ pipeline {
     }
 
     environment {
-        SCANNER_HOME = tool 'sonar-scanner'
-        DOCKER_IMAGE = 'sapna350/bms-app:latest'
-        EKS_CLUSTER_NAME = 'Team2-eks-cluster'
-        AWS_REGION = 'eu-west-3'
+        REGISTRY = "sapna350/bookmyshow"
+        IMAGE_TAG = "latest"
     }
 
     stages {
-        stage('Clean Workspace') {
-            steps {
-                cleanWs()
-            }
-        }
 
         stage('Checkout from Git') {
             steps {
-                git branch: 'main', url: 'https://github.com/Sapna35/Book-My-Show.git'
-                sh 'ls -la'
+                git(
+                    url: 'https://github.com/Sapna35/Book-My-Show.git',
+                    branch: 'main',
+                    credentialsId: 'github-cred'
+                )
             }
         }
 
         stage('SonarQube Analysis') {
             steps {
-                withSonarQubeEnv('sonar-server') {
-                    sh ''' 
-                    $SCANNER_HOME/bin/sonar-scanner \
-                        -Dsonar.projectName=BookMyShow \
-                        -Dsonar.projectKey=BookMyShow
+                withSonarQubeEnv('sonar-server') {   // 👈 make sure this name matches Jenkins config
+                    sh '''
+                        ./gradlew sonarqube \
+                          -Dsonar.projectKey=BookMyShow \
+                          -Dsonar.host.url=http://13.38.227.93:9000 \
+                          -Dsonar.login=$SONAR_AUTH_TOKEN
                     '''
                 }
             }
@@ -41,78 +38,44 @@ pipeline {
 
         stage('Quality Gate') {
             steps {
-                script {
-                    waitForQualityGate abortPipeline: false, credentialsId: 'Sonar-token'
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
                 }
             }
         }
 
         stage('Install Dependencies') {
             steps {
-                sh '''
-                cd bookmyshow-app
-                ls -la
-                if [ -f package.json ]; then
-                    rm -rf node_modules package-lock.json
-                    npm install
-                else
-                    echo "Error: package.json not found in bookmyshow-app!"
-                    exit 1
-                fi
-                '''
+                sh 'npm install --prefix bookmyshow-app'
             }
         }
 
         stage('Docker Build & Push') {
             steps {
-                script {
-                    withDockerRegistry(credentialsId: 'docker-hub-cred', toolName: 'docker') {
-                        sh ''' 
-                        echo "Building Docker image..."
-                        docker build --no-cache -t $DOCKER_IMAGE -f bookmyshow-app/Dockerfile bookmyshow-app
-
-                        echo "Pushing Docker image to Docker Hub..."
-                        docker push $DOCKER_IMAGE
-                        '''
-                    }
-                }
+                sh """
+                   docker build -t $REGISTRY:$IMAGE_TAG .
+                   docker push $REGISTRY:$IMAGE_TAG
+                """
             }
         }
 
         stage('Deploy to EKS Cluster') {
             steps {
-                script {
-                    sh '''
-                    echo "Verifying AWS credentials..."
-                    aws sts get-caller-identity
-
-                    echo "Configuring kubectl for EKS cluster..."
-                    aws eks update-kubeconfig --name $EKS_CLUSTER_NAME --region $AWS_REGION
-
-                    echo "Verifying kubeconfig..."
-                    kubectl config view
-
-                    echo "Deploying application to EKS..."
-                    kubectl apply -f k8s/deployment.yaml
-                    kubectl apply -f k8s/service.yaml
-
-                    echo "Verifying deployment..."
-                    kubectl get pods
-                    kubectl get svc
-                    '''
-                }
+                sh """
+                   kubectl apply -f deployment.yml
+                   kubectl apply -f service.yml
+                """
             }
         }
     }
 
     post {
         always {
-            emailext attachLog: true,
-                subject: "'${currentBuild.result}'",
-                body: "Project: ${env.JOB_NAME}<br/>" +
-                      "Build Number: ${env.BUILD_NUMBER}<br/>" +
-                      "URL: ${env.BUILD_URL}<br/>",
-                to: 'sapna.rani@gmail.com'
+            emailext(
+                to: 'sapna.rani@gmail.com',
+                subject: "Build \${currentBuild.fullDisplayName} - \${currentBuild.currentResult}",
+                body: "Check Jenkins for details: \${env.BUILD_URL}"
+            )
         }
     }
 }
