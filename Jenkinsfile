@@ -16,7 +16,7 @@ pipeline {
 
         stage('Install Dependencies') {
             steps {
-                dir('bookmyshow-app') {   // go inside app folder
+                dir('bookmyshow-app') {   // <- go inside folder
                     sh 'npm install'
                 }
             }
@@ -30,50 +30,25 @@ pipeline {
 
         stage('Docker Build') {
             steps {
-                dir('bookmyshow-app') {   // build Docker image from app folder
-                    sh """
-                        docker build -t sapna350/bookmyshow-app:${BUILD_NUMBER} .
-                        docker tag sapna350/bookmyshow-app:${BUILD_NUMBER} sapna350/bookmyshow-app:latest
-                    """
+                dir('bookmyshow-app') {   // <- Docker build context is inside folder
+                    sh 'docker build -t sapna350/bms-app:latest .'
                 }
             }
         }
 
-        stage('Docker Push') {
+        stage('Push to DockerHub') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'docker-cred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                    sh """
-                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                        docker push sapna350/bookmyshow-app:${BUILD_NUMBER}
-                        docker push sapna350/bookmyshow-app:latest
-                    """
+                withCredentials([usernamePassword(credentialsId: 'docker-hub-cred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
+                    sh 'docker push sapna350/bms-app:latest'
                 }
             }
         }
 
-        stage('Deploy to EKS') {
+        stage('Deploy') {
             steps {
-                sh """
-                    aws eks --region ap-south-1 update-kubeconfig --name sapna-eks-cluster
-                    kubectl apply -f k8s/deployment.yaml
-                    kubectl apply -f k8s/service.yaml
-                """
+                sh 'docker run -d -p 3000:3000 sapna350/bms-app:latest'
             }
-        }
-    }
-
-    post {
-        always {
-            emailext (
-                to: 'sapnarani3502@gmail.com',
-                subject: "Jenkins Pipeline: ${currentBuild.currentResult}",
-                body: """
-                    Build result: ${currentBuild.currentResult}
-                    Project: ${env.JOB_NAME}
-                    Build Number: ${env.BUILD_NUMBER}
-                    Check console output at ${env.BUILD_URL}
-                """
-            )
         }
     }
 }
