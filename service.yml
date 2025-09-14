@@ -8,5 +8,5 @@ spec:
   selector:
     app: bms
   ports:
-    - port: 80          # Service Port (public-facing)
-      targetPort: 3000  # App inside container
+    - port: 80         
+      targetPort: 3000  
