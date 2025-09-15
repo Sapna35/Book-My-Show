@@ -2,12 +2,11 @@ apiVersion: v1
 kind: Service
 metadata:
   name: bms-service
-  labels:
-    app: bms
+  namespace: sapna-bms
 spec:
+  selector:
+    app: bms   
   type: LoadBalancer
   ports:
-  - port: 80
-    targetPort: 3000  
-  selector:
-    app: bms
+    - port: 80         
+      targetPort: 3000 
