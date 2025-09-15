@@ -7,6 +7,7 @@ pipeline {
                 cleanWs()
             }
         }
+        
 
         stage('Checkout Code') {
             steps {
