@@ -51,4 +51,31 @@ pipeline {
             }
         }
     }
+     post {
+        success {
+            emailext(
+                subject: " SUCCESS: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]'",
+                body: """<p>The build completed <b>SUCCESSFULLY</b>.</p>
+                         <p>Project: ${env.JOB_NAME}</p>
+                         <p>Build Number: ${env.BUILD_NUMBER}</p>
+                         <p>URL: <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>""",
+                to: 'sapnarani3502@gmail.com'
+            )
+        }
+
+        failure {
+            emailext(
+                subject: " FAILURE: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]'",
+                body: """<p>The build has <b>FAILED</b>.</p>
+                         <p>Project: ${env.JOB_NAME}</p>
+                         <p>Build Number: ${env.BUILD_NUMBER}</p>
+                         <p>URL: <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>""",
+                to: 'sapnarani3502@gmail.com'
+            )
+        }
+
+        always {
+            echo "Build finished. Email notification sent."
+        }
+    }
 }
